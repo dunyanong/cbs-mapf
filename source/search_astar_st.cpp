@@ -44,37 +44,38 @@ StateSpaceST::~StateSpaceST() {};
 void StateSpaceST::GetSuccs(
   StateST& s, 
   std::vector<StateST>* out, 
-  std::vector<std::vector<double> >* out_costs)
-{
-  // Get all possible successors of the current vertex.
+  std::vector<std::vector<double>>* out_costs
+) {
+  std::cout << "[DEBUG] Generating successors for state: " << s << std::endl;
+
   auto uAll = Grid2d::GetSuccs(s.v);
   uAll.push_back(s.v); // Add the option to wait in place.
 
-  for (auto& u : uAll){
-    int y = _k2r(u); // Convert vertex to row.
-    int x = _k2c(u); // Convert vertex to column.
+  for (auto& u : uAll) {
+      int y = _k2r(u);
+      int x = _k2c(u);
 
-    // Skip if the position is out of bounds.
-    if (!IsWithinBorder(y, x)){
-      continue;
-    }
+      if (!IsWithinBorder(y, x)) {
+          std::cout << "[DEBUG] Skipping out-of-bounds successor: " << u << std::endl;
+          continue;
+      }
 
-    // Skip if the position is occupied by a static obstacle.
-    if (_occu_grid_ptr->at(y).at(x) != 0) {
-      continue;
-    }
+      if (_occu_grid_ptr->at(y).at(x) != 0) {
+          std::cout << "[DEBUG] Skipping occupied successor: " << u << std::endl;
+          continue;
+      }
 
-    // Add the successor state and its cost.
-    size_t kth = out->size();
-    out->resize(kth+1);
-    out->at(kth).v = u;
-    out->at(kth).t = s.t + 1;
-    out_costs->resize(kth+1);
-    out_costs->at(kth).resize(1);
-    out_costs->at(kth)[0] = 1; // Move cost is 1.
+      size_t kth = out->size();
+      out->resize(kth + 1);
+      out->at(kth).v = u;
+      out->at(kth).t = s.t + 1;
+      out_costs->resize(kth + 1);
+      out_costs->at(kth).resize(1);
+      out_costs->at(kth)[0] = 1; // Move cost is 1
+
+      std::cout << "[DEBUG] Added successor: " << u << " at time: " << s.t + 1 << std::endl;
   }
-  return ;
-};
+}
 
 //////////
 
@@ -140,6 +141,11 @@ int AstarSTGrid2d::_search() {
   _init_more(); // Additional initialization.
 
   auto ss = dynamic_cast<StateSpaceST*>(_graph);
+  if (!ss) {
+      std::cerr << "[ERROR] AstarSTGrid2d::_search: _graph is not a valid StateSpaceST object!" << std::endl;
+      std::cerr << "[DEBUG] _graph type: " << typeid(*_graph).name() << std::endl;
+      throw std::runtime_error("[ERROR] Invalid StateSpaceST object.");
+  }
 
   // ### Initialization ###
   SimpleTimer timer;
@@ -161,88 +167,75 @@ int AstarSTGrid2d::_search() {
   long n_exp = 0; // Number of expanded nodes.
   long n_gen = 0; // Number of generated nodes.
 
-  // Main search loop.
-  while(!_open.empty()){
+  // 
+  std::unordered_set<long> visited; // Track visited states
 
-    // Check for timeout.
+  while (!_open.empty()) {
+    std::cout << "[DEBUG] Open list size: " << _open.size() << std::endl;
+
+    // Check for timeout
     if (timer.GetDurationSecond() > _time_limit) {
-      std::cout << "[INFO] AstarSTGrid2d::Search timeout !" << std::endl;
-      break;
+        std::cout << "[INFO] AstarSTGrid2d::Search timeout!" << std::endl;
+        break;
     }
 
-    // ## select label l, lexicographic order ##
-        auto cur = _open.top(); _open.pop();
-    StateST s = _states[ cur.id];
+    auto cur = _open.top();
+    _open.pop();
+
+    if (visited.count(cur.id)) {
+        continue; // Skip already visited states
+    }
+    visited.insert(cur.id);
+
+    // Process the current state
+    StateST s = _states[cur.id];
     double g_s = _g_all[s.ToStr()];
 
-    if (DEBUG_ASTAR_ST > 0) {
-      std::cout << "[DEBUG] ### Pop state = " << s << " g=" << g_s << " h=" << _heuristic(s.v) << " f=" << cur.f() << std::endl;
+    std::cout << "[DEBUG] Processing state: " << s << " with g=" << g_s << std::endl;
+
+    // Check if the goal condition is met
+    if (_check_terminate(s)) {
+        std::cout << "[DEBUG] Goal reached at state: " << s << std::endl;
+        _reached_goal_state_id = s.id;
+        break;
     }
 
-    // Check if the goal condition is met.
-    if ( _check_terminate(s) ){
-      _reached_goal_state_id = s.id;
-      break;
-    }
-
-    if (DEBUG_ASTAR_ST > 1) {
-      std::cout << "[DEBUG] ### Exp. " << s << std::endl;
-    }
-
-    // Expand the current state.
+    // Expand the current state
     std::vector<StateST> succs;
-    std::vector<std::vector<double> > cvecs;
+    std::vector<std::vector<double>> cvecs;
     ss->GetSuccs(s, &succs, &cvecs);
 
-    n_exp++; // Increment the expanded node count.
+    std::cout << "[DEBUG] Number of successors: " << succs.size() << std::endl;
 
-    if (DEBUG_ASTAR_ST > 0) {
-      std::cout << "[DEBUG] get " << succs.size() << " successors" << std::endl;
-    }
-
-    // Process each successor.
     for (int idx = 0; idx < succs.size(); idx++) {
-      auto& s2 = succs[idx];
+        auto& s2 = succs[idx];
 
-      // Check for collisions.
-      if ( _collide_check(s.v, s2.v, s.t) ) {
-        continue; // Skip if there is a conflict.
-      }
-
-      double g2 = g_s + cvecs[idx][0]; // Calculate the cost to reach the successor.
-
-      if (DEBUG_ASTAR_ST > 0) {
-        std::cout << "[DEBUG] --- Loop s= " << s2 << " g=" << g2 << " h=" << _heuristic(s2.v) << std::endl;
-      }
-
-      auto s2str = s2.ToStr();
-      if (_g_all.find(s2str) != _g_all.end()) {
-        if (_g_all[s2str] < g2) {
-          if (DEBUG_ASTAR_ST > 1) {
-            std::cout << "[DEBUG] ----- pruned, cont..." << std::endl;
-          }
-          continue; // Prune if a better path already exists.
+        // Check for collisions
+        if (_collide_check(s.v, s2.v, s.t)) {
+            std::cout << "[DEBUG] Collision detected for successor: " << s2 << std::endl;
+            continue;
         }
-      }
 
-      // Add the successor to the open list.
-      s2.id = _gen_label_id();
-      _states[s2.id] = s2;
-      _parent[s2.id] = s.id; 
-      _g_all[s2str] = g2;
+        double g2 = g_s + cvecs[idx][0];
+        auto s2str = s2.ToStr();
 
-      n_gen++; // Increment the generated node count.
+        if (_g_all.find(s2str) != _g_all.end() && _g_all[s2str] < g2) {
+            std::cout << "[DEBUG] Pruning successor: " << s2 << " with g=" << g2 << std::endl;
+            continue;
+        }
 
-      if (DEBUG_ASTAR_ST > 0) {
-        std::cout << "[DEBUG] ----- Add to open..." << std::endl;
-      }
+        // Add the successor to the open list
+        s2.id = _gen_label_id();
+        _states[s2.id] = s2;
+        _parent[s2.id] = s.id;
+        _g_all[s2str] = g2;
 
-      auto h2 = _wh*_heuristic(s2.v);
-      _open.push(Node(s2.v, g2, h2));
+        auto h2 = _wh * _heuristic(s2.v);
+        _open.push(Node(s2.v, g2, h2));
 
-    } // end for
-  } // end while
-
+        std::cout << "[DEBUG] Added successor: " << s2 << " with g=" << g2 << " and h=" << h2 << std::endl;
+    }
+}  
   std::cout << "[INFO] AstarSTGrid2d::Search exit after " << timer.GetDurationSecond() << " seconds with n_exp=" << n_exp << " n_gen=" << n_gen << std::endl;
 
   return 1;
@@ -250,11 +243,12 @@ int AstarSTGrid2d::_search() {
 
 // Checks if the goal condition is met.
 bool AstarSTGrid2d::_check_terminate(StateST& s) {
-  if ( (s.v == _vg) && (s.t > _last_nc_t) ) {
-    return true;
+  if ((s.v == _vg) && (s.t > _last_nc_t)) {
+      std::cout << "[DEBUG] Goal condition met for state: " << s << std::endl;
+      return true;
   }
   return false;
-};
+}
 
 // Generates a unique label ID for states.
 long AstarSTGrid2d::_gen_label_id() {
@@ -297,22 +291,20 @@ void AstarSTGrid2d::_init_more() {
 
 // Checks for collisions (node and edge constraints).
 bool AstarSTGrid2d::_collide_check(long v1, long v2, long t) {
-  // Node constraint check.
-  if (_avl_node[v2].Find(t+1).h != 0) {
-    return true;
+  if (_avl_node[v2].Find(t + 1).h != 0) {
+      std::cout << "[DEBUG] Node constraint violated at vertex: " << v2 << " at time: " << t + 1 << std::endl;
+      return true;
   }
-  // Edge constraint check.
-  if (_avl_edge.find(v1) == _avl_edge.end() ) {
-    return false;
+
+  if (_avl_edge.find(v1) != _avl_edge.end() && 
+      _avl_edge[v1].find(v2) != _avl_edge[v1].end() && 
+      _avl_edge[v1][v2].Find(t).h != 0) {
+      std::cout << "[DEBUG] Edge constraint violated between " << v1 << " and " << v2 << " at time: " << t << std::endl;
+      return true;
   }
-  if (_avl_edge[v1].find(v2) == _avl_edge[v1].end() ) {
-    return false;
-  }
-  if (_avl_edge[v1][v2].Find(t).h == 0 ) {
-    return false;
-  }
-  return true;
-};
+
+  return false;
+}
 
 // Retrieves the path from the start to the goal.
 std::vector<long> AstarSTGrid2d::GetPath(long v, bool do_reverse) {

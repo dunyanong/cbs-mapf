@@ -16,7 +16,7 @@ GraphSearch::~GraphSearch() {};
 
 void GraphSearch::SetGraphPtr(PlannerGraph* g) {
   _graph = g;
-  _vs = -1; // every time when the graph is changed, reset start and goals.
+  _vs = -1;
   _vg = -1;
   _mode = 0;
 };
