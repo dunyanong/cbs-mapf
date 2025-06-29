@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.5) # Specify the minimum required version of CMake
-project(cppraplab) # Define the project name
+cmake_minimum_required(VERSION 3.10)
+
+# Project name and optionally its version
+project(public_graph VERSION 1.0)
 
 # find_package(Boost REQUIRED) # Uncomment this if Boost is required for the project
 find_package(Threads REQUIRED) # Find and include the Threads library (required for multithreading)

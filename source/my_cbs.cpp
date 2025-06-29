@@ -89,6 +89,7 @@ namespace raplab {
         return {}; // Return empty paths if no solution is found
     }
 
+    
     std::vector<long> CBS::LowLevelSearch(
         int agent,
         const std::vector<Constraint>& constraints,
@@ -97,24 +98,31 @@ namespace raplab {
     ) {
         std::cout << "[DEBUG] Starting low-level search for agent " << agent 
                   << " from " << start << " to " << goal << "." << std::endl;
-
+    
         AstarSTGrid2d planner;
         planner.SetGraphPtr(input_graph);
-
+    
+        // Add node constraints
         for (const auto& constraint : constraints) {
             if (constraint.agent == agent) {
                 planner.AddNodeCstr(constraint.vertex, constraint.time);
-                std::cout << "[DEBUG] Adding constraint for agent " << agent 
+                std::cout << "[DEBUG] Adding node constraint for agent " << agent 
                           << ": vertex " << constraint.vertex 
                           << ", time " << constraint.time << "." << std::endl;
             }
         }
-
-        auto path = planner.PathFinding(start, goal, std::numeric_limits<double>::infinity());
-        std::cout << "[DEBUG] Low-level search completed for agent " << agent 
-                  << ". Path length: " << path.size() << std::endl;
+    
+        // Perform pathfinding
+        auto path = planner.PathFinding(start, goal, 10.0); // Example timeout of 10 seconds
+        if (path.empty()) {
+            std::cerr << "[ERROR] Low-level search failed for agent " << agent << "." << std::endl;
+        } else {
+            std::cout << "[DEBUG] Low-level search completed for agent " << agent 
+                      << ". Path length: " << path.size() << std::endl;
+        }
         return path;
     }
+
 
     bool CBS::DetectConflict(
         const std::vector<std::vector<long>>& paths,
@@ -127,17 +135,46 @@ namespace raplab {
 
         for (int i = 0; i < paths.size(); ++i) {
             for (int j = i + 1; j < paths.size(); ++j) {
-                for (int t = 0; t < std::min(paths[i].size(), paths[j].size()); ++t) {
-                    if (paths[i][t] == paths[j][t]) {
+                if (paths[i].empty() || paths[j].empty()) {
+                    std::cout << "[DEBUG] Skipping conflict check for empty paths: agent " 
+                              << i << " or agent " << j << "." << std::endl;
+                    continue;
+                }
+
+                int max_time = std::max(paths[i].size(), paths[j].size());
+                for (int t = 0; t < max_time; ++t) {
+                    long pos_i = (t < paths[i].size()) ? paths[i][t] : paths[i].back();
+                    long pos_j = (t < paths[j].size()) ? paths[j][t] : paths[j].back();
+
+                    // Check for vertex conflict
+                    if (pos_i == pos_j) {
                         agent1 = i;
                         agent2 = j;
-                        conflict_vertex = paths[i][t];
+                        conflict_vertex = pos_i;
                         conflict_time = t;
-                        std::cout << "[DEBUG] Conflict detected: agent " << agent1 
+                        std::cout << "[DEBUG] Vertex conflict detected: agent " << agent1 
                                   << " and agent " << agent2 
                                   << " at vertex " << conflict_vertex 
                                   << " at time " << conflict_time << "." << std::endl;
                         return true;
+                    }
+
+                    // Check for edge conflict
+                    if (t > 0 && t < paths[i].size() && t < paths[j].size()) {
+                        long prev_i = paths[i][t - 1];
+                        long prev_j = paths[j][t - 1];
+                        if (pos_i == prev_j && pos_j == prev_i) {
+                            agent1 = i;
+                            agent2 = j;
+                            conflict_vertex = -1; // No single vertex conflict
+                            conflict_time = t;
+                            std::cout << "[DEBUG] Edge conflict detected: agent " << agent1 
+                                      << " and agent " << agent2 
+                                      << " crossing edge (" << prev_i << " -> " << pos_i 
+                                      << ") and (" << prev_j << " -> " << pos_j 
+                                      << ") at time " << conflict_time << "." << std::endl;
+                            return true;
+                        }
                     }
                 }
             }
