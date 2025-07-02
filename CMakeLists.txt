@@ -3,6 +3,15 @@ project(cppraplab) # Define the project name
 
 # find_package(Boost REQUIRED) # Uncomment this if Boost is required for the project
 find_package(Threads REQUIRED) # Find and include the Threads library (required for multithreading)
+include(FetchContent)
+FetchContent_Declare(SFML
+    GIT_REPOSITORY https://github.com/SFML/SFML.git
+    GIT_TAG 3.0.1
+    GIT_SHALLOW ON
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+FetchContent_MakeAvailable(SFML)
+
 
 # Set the C++ standard to C++11 (or C++0x, which is an older name for C++11)
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
@@ -48,8 +57,22 @@ foreach(test_cpp_file ${test_cpp_files})
   ADD_EXECUTABLE(${test_cpp_name} ${test_cpp_dir}/${test_cpp_name}.cpp)
 
   # Link the test executable with the project library and threading library
-  TARGET_LINK_LIBRARIES(${test_cpp_name} 
-    ${PROJECT_NAME} # Link the shared library created earlier
-    ${CMAKE_THREAD_LIBS_INIT} # Link the threading library
+  target_link_libraries(${test_cpp_name} 
+    ${PROJECT_NAME}
+    Threads::Threads
+    SFML::Graphics
+    SFML::Window
+    SFML::System
   )
 endforeach(test_cpp_file ${test_cpp_files}) # End of the loop
+
+# Add the dikjstra_animation executable
+add_executable(dikjstra_animation animation/dikjstra_animation.cpp)
+
+# Link SFML libraries to the executable
+target_link_libraries(dikjstra_animation
+    SFML::Graphics
+    SFML::Window
+    SFML::System
+    SFML::Audio
+)
