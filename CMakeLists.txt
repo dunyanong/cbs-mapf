@@ -67,10 +67,13 @@ foreach(test_cpp_file ${test_cpp_files})
 endforeach(test_cpp_file ${test_cpp_files}) # End of the loop
 
 # Add the dikjstra_animation executable
-add_executable(dikjstra_animation animation/dikjstra_animation.cpp)
+add_executable(
+  dikjstra_animation animation/dikjstra_animation.cpp
+)
 
 # Link SFML libraries to the executable
 target_link_libraries(dikjstra_animation
+  ${PROJECT_NAME}
     SFML::Graphics
     SFML::Window
     SFML::System
