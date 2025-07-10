@@ -1,120 +1,112 @@
-#include "search_astar_st.hpp"
-#include "debug.hpp"
 #include <opencv2/opencv.hpp>
-#include <sstream>
-#include <iomanip>
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <string>
+#include "movingai_map_parser.hpp"
+#include "movingai_scen_parser.hpp"
+#include "search_astar.hpp"
 
-int TestAstarSTGrid2d();
-void SaveFrame(int timestep,
-    const std::vector<std::vector<double>>& occu_grid,
-    const std::vector<long>& path,
-    int agent_index = -1);
+using namespace std;
+using namespace cv;
+using namespace movingai;
+using namespace raplab;
 
-int main(){
-    system("mkdir -p frames");
-    cv::Mat testimg(400, 400, CV_8UC3, cv::Scalar(255,255,255));
-    cv::imwrite("frames/test.png", testimg);
-    std::cout << "Saved test.png to frames folder." << std::endl;    
+const int CELL_SIZE = 10;
+const Scalar OBSTACLE_COLOR(0, 0, 0); // Black
+const Scalar EMPTY_COLOR(255, 255, 255); // White
+const Scalar PATH_COLOR(0, 255, 0); // Green
+const Scalar AGENT_COLOR(0, 0, 255); // Red
 
-    TestAstarSTGrid2d();
-
-    return 0;
-};
-
-
-int TestAstarSTGrid2d(){
-
-    std::cout << "####### TestAstarSTGrid2d() Begin #######" << std::endl;
-    raplab::SimpleTimer timer;
-    timer.Start();
-
-    // raplab::Grid2d
-    raplab::StateSpaceST g;
-    std::vector<std::vector<double> > occupancy_grid;
-    occupancy_grid.resize(10);
-    for (int i = 0; i < 10; i++){
-        occupancy_grid[i].resize(10, 0);
-    }
-    for (int i = 0; i < 10; i++){
-        if (i == 5){continue;}
-        occupancy_grid[5][i] = 1;
-    }
-    g.SetOccuGridPtr(&occupancy_grid);
-
-    timer.Start();
-    auto pp = raplab::AstarSTGrid2d();
-    pp.SetGraphPtr(&g);
-    pp.AddNodeCstr(3,3);
-    pp.AddNodeCstr(12,3);
-    pp.AddEdgeCstr(24,25,6);
-    pp.AddNodeCstr(99,20);
-    pp.SetHeuWeight(1.2);
-    auto p = pp.PathFinding(0,99,10); // Start from vertex 0 to vertex 99 with a time limit of 10 seconds
-
-    system("mkdir -p frames");
-
-    std::cout << "Path size: " << p.size() << std::endl;
-    if (p.empty()) {
-        std::cout << "Path is empty! No frames will be saved." << std::endl;
-    }    
-
-    for (int t = 0; t < p.size(); ++t) {
-        SaveFrame(t, occupancy_grid, p);
-        
-    }   
-
-
-    auto d_all = pp.GetDistAll();
-    for (auto vv : p) {
-    std::cout << " v = " << vv << " dist = " << d_all[vv] << std::endl;
-    }
-    for (size_t jj = 0; jj < d_all.size(); jj++) {
-    std::cout << " d_all[" << jj << "] = " << d_all[jj] << std::endl;
-    }
-
-    std::cout << " p = " << p << std::endl;
-
-    timer.PrintDuration();
-
-    std::cout << "####### TestAstarSTGrid2d() End #######" << std::endl;
-
-    return 1;
-};
-
-void SaveFrame(int timestep,
-            const std::vector<std::vector<double>>& occu_grid,
-            const std::vector<long>& path,
-            int agent_index)
-{
-    int rows = occu_grid.size();
-    int cols = occu_grid[0].size();
-    int cell_size = 40;
-
-    cv::Mat img(rows * cell_size, cols * cell_size, CV_8UC3, cv::Scalar(255,255,255));
-
-    // Draw obstacles
-    for (int r = 0; r < rows; r++) {
-        for (int c = 0; c < cols; c++) {
-            if (occu_grid[r][c] == 1) {
-                cv::rectangle(img, cv::Rect(c * cell_size, r * cell_size, cell_size, cell_size), cv::Scalar(0,0,0), cv::FILLED);
+void drawGrid(const gridmap& map, Mat& img) {
+    for (int y = 0; y < map.height_; y++) {
+        for (int x = 0; x < map.width_; x++) {
+            Rect cell(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            if (map.is_obstacle({x, y})) {
+                rectangle(img, cell, OBSTACLE_COLOR, FILLED);
+            } else {
+                rectangle(img, cell, EMPTY_COLOR, FILLED);
             }
         }
     }
+}
 
-    // Draw path so far
-    for (int i = 0; i <= timestep && i < path.size(); ++i) {
-        int vid = path[i];
-        int r = vid / cols;
-        int c = vid % cols;
-        cv::circle(img, cv::Point(c * cell_size + cell_size / 2, r * cell_size + cell_size / 2), cell_size / 3,
-                (i == timestep ? cv::Scalar(0, 0, 255) : cv::Scalar(200, 100, 100)), -1);
+void drawPath(const vector<State>& path, Mat& img) {
+    for (const auto& state : path) {
+        Rect cell(state.x * CELL_SIZE, state.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        rectangle(img, cell, PATH_COLOR, FILLED);
+    }
+}
+
+void drawAgent(const State& agent, Mat& img) {
+    Rect cell(agent.x * CELL_SIZE, agent.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    rectangle(img, cell, AGENT_COLOR, FILLED);
+}
+
+vector<State> convertPath(const vector<long>& path, int width) {
+    vector<State> result;
+    for (long id : path) {
+        result.push_back({static_cast<vid>(id % width), static_cast<vid>(id / width)});
+
+    }
+    return result;
+}
+
+int main() {
+    string mapFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map";
+    string scenFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map.scen";
+
+    // Load map
+    gridmap map(mapFile);
+
+    // Load scenario
+    scenario_manager scenMgr;
+    scenMgr.load_scenario(scenFile);
+
+    // Create OpenCV window
+    Mat img(map.height_ * CELL_SIZE, map.width_ * CELL_SIZE, CV_8UC3);
+    namedWindow("Pathfinding Animation", WINDOW_AUTOSIZE);
+
+    // Iterate through test cases
+    for (int i = 0; i < scenMgr.num_experiments(); i++) {
+        auto expr = scenMgr.get_experiment(i);
+
+        // Initialize A* planner
+        Grid2d g;
+        vector<vector<double>> occupancyGrid(map.height_, vector<double>(map.width_, 0));
+        for (int y = 0; y < map.height_; y++) {
+            for (int x = 0; x < map.width_; x++) {
+                occupancyGrid[y][x] = map.is_obstacle({x, y}) ? 1 : 0;
+            }
+        }
+        g.SetOccuGridPtr(&occupancyGrid);
+
+        AstarGrid2d planner;
+        planner.SetGraphPtr(&g);
+
+        // Perform pathfinding
+        int startId = expr->starty() * map.width_ + expr->startx();
+        int goalId = expr->goaly() * map.width_ + expr->goalx();
+        auto path = planner.PathFinding(startId, goalId);
+
+        // Convert path to grid coordinates
+        auto gridPath = convertPath(path, map.width_);
+
+        // Draw initial grid
+        drawGrid(map, img);
+        drawPath(gridPath, img);
+
+        // Animate agent movement
+        for (const auto& state : gridPath) {
+            Mat frame = img.clone();
+            drawAgent(state, frame);
+            imshow("Pathfinding Animation", frame);
+            waitKey(100); // Delay for animation
+        }
+
+        waitKey(500); // Pause before next test case
     }
 
-    // Save frame
-    std::ostringstream filename;
-    filename << "frames/frame_" << std::setw(3) << std::setfill('0') << timestep << ".png";
-    bool success = cv::imwrite(filename.str(), img);
-    if (!success) {
-        std::cerr << "Failed to save image: " << filename.str() << std::endl;
-    }    
+    destroyAllWindows();
+    return 0;
 }
