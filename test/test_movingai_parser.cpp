@@ -51,14 +51,14 @@ void test_scen_parser(string filename) {
 // Main function to test the map and scenario parsers
 int main() {
   // Define the path to the map file
-  string mapfile = "./data/arena/arena.map";
+  string mapfile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map";
   
   // Test the map parser with the specified map file
   test_graph_parser(mapfile);
   cout << endl; // Print a blank line for separation
   
   // Define the path to the scenario file
-  string scenfile = "./data/arena/arena.map.scen";
+  string scenfile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map.scen";
   
   // Test the scenario parser with the specified scenario file
   test_scen_parser(scenfile);

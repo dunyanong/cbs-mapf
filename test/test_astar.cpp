@@ -128,8 +128,8 @@ int TestAstarGrid2d() {
 
 int TestMovingAIGrid2D() {
   // Load map and scenario files for the MovingAI benchmark
-  std::string mapfile = "./data/arena/arena.map";
-  std::string scenfile = "./data/arena/arena.map.scen";
+  std::string mapfile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map";
+  std::string scenfile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map.scen";
   movingai::gridmap _g(mapfile);
   movingai::scenario_manager scen_mgr;
   scen_mgr.load_scenario(scenfile);
