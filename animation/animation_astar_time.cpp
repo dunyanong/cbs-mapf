@@ -13,10 +13,12 @@ using namespace movingai;
 using namespace raplab;
 
 const int CELL_SIZE = 10;
-const Scalar OBSTACLE_COLOR(0, 0, 0); // Black
-const Scalar EMPTY_COLOR(255, 255, 255); // White
-const Scalar PATH_COLOR(0, 255, 0); // Green
-const Scalar AGENT_COLOR(0, 0, 255); // Red
+const Scalar OBSTACLE_COLOR(0, 0, 0);
+const Scalar EMPTY_COLOR(255, 255, 255);
+const Scalar PATH_COLOR(0, 255, 0);
+const Scalar AGENT_COLOR(0, 0, 255);
+const Scalar START_COLOR(255, 0, 255);
+const Scalar GOAL_COLOR(0, 255, 255);
 
 void drawGrid(const gridmap& map, Mat& img) {
     for (int y = 0; y < map.height_; y++) {
@@ -31,8 +33,12 @@ void drawGrid(const gridmap& map, Mat& img) {
     }
 }
 
-void drawPath(const vector<State>& path, Mat& img) {
+void drawPath(const vector<State>& path, Mat& img, const State& start, const State& goal) {
     for (const auto& state : path) {
+        if ((state.x == start.x && state.y == start.y) ||
+            (state.x == goal.x && state.y == goal.y)) {
+            continue;
+        }
         Rect cell(state.x * CELL_SIZE, state.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         rectangle(img, cell, PATH_COLOR, FILLED);
     }
@@ -52,6 +58,20 @@ vector<State> convertPath(const vector<long>& path, int width) {
     return result;
 }
 
+void drawStartAndGoal(const State& start, const State& goal, Mat& img) {
+    cout << "Drawing start marker at: (" << start.x << ", " << start.y << ")" << endl;
+    cout << "Drawing goal marker at: (" << goal.x << ", " << goal.y << ")" << endl;
+
+    Rect startCell(start.x * CELL_SIZE, start.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    Rect goalCell(goal.x * CELL_SIZE, goal.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+    rectangle(img, startCell, START_COLOR, FILLED);
+    rectangle(img, startCell, Scalar(0, 0, 0), 1);
+
+    rectangle(img, goalCell, GOAL_COLOR, FILLED);
+    rectangle(img, goalCell, Scalar(0, 0, 0), 1);
+}
+
 int main() {
     string mapFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map";
     string scenFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map.scen";
@@ -67,14 +87,17 @@ int main() {
     Mat img(map.height_ * CELL_SIZE, map.width_ * CELL_SIZE, CV_8UC3);
     namedWindow("Pathfinding Animation", WINDOW_AUTOSIZE);
 
-    // Iterate through test cases
-    // for (int i = 0; i < scenMgr.num_experiments(); i++) {
-    auto expr = scenMgr.get_experiment(55); // For simplicity, using the 55 experiment
+    // Get the test case
+    auto expr = scenMgr.get_experiment(55); // For simplicity, using the 55th experiment
+
+    if (!expr) {
+        cerr << "Error: expr is null!" << endl;
+        return -1;
+    }    
 
     // Initialize A* planner
     Grid2d g;
     vector<vector<double>> occupancyGrid(map.height_, vector<double>(map.width_, 0));
-    
     for (int y = 0; y < map.height_; y++) {
         for (int x = 0; x < map.width_; x++) {
             occupancyGrid[y][x] = map.is_obstacle({x, y}) ? 1 : 0;
@@ -94,8 +117,21 @@ int main() {
     auto gridPath = convertPath(path, map.width_);
 
     // Draw initial grid
+    State startState = {
+        static_cast<vid>(expr->startx()),
+        static_cast<vid>(expr->starty())
+    };
+    State goalState = {
+        static_cast<vid>(expr->goalx()),
+        static_cast<vid>(expr->goaly())
+    };
     drawGrid(map, img);
-    drawPath(gridPath, img);
+    drawPath(gridPath, img, startState, goalState);
+    drawStartAndGoal(startState, goalState, img);
+
+    // Display the image to ensure markers are visible
+    imshow("Pathfinding Animation", img);
+    waitKey(100);
 
     if (gridPath.empty()) {
         cerr << "No path found between start and goal!" << endl;
@@ -104,15 +140,14 @@ int main() {
 
     // Animate agent movement
     for (const auto& state : gridPath) {
-        cout << "Drawing agent at: (" << state.x << ", " << state.y << ")" << endl;
+        // cout << "Drawing agent at: (" << state.x << ", " << state.y << ")" << endl;
         Mat frame = img.clone();
         drawAgent(state, frame);
         imshow("Pathfinding Animation", frame);
         waitKey(100); // Delay for animation
     }
 
-    waitKey(50000); // Pause before exiting
-    // }
+    waitKey(1000);
 
     destroyAllWindows();
     return 0;

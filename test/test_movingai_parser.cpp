@@ -1,8 +1,13 @@
-#include "movingai_map_parser.hpp" // Include the header for parsing map files
-#include "movingai_scen_parser.hpp" // Include the header for parsing scenario files
-#include <string> // Include the string library for handling strings
-#include <iostream> // Include the iostream library for input/output operations
-using namespace std; // Use the standard namespace to simplify code
+#include "movingai_map_parser.hpp"
+#include "movingai_scen_parser.hpp"
+#include <string>
+#include <iostream>
+#include <cstdlib>
+using namespace std;
+
+
+const char* mapFile = std::getenv("MAPFILE");
+const char* scenFile = std::getenv("SCENFILE");
 
 // Function to test parsing of a map file
 void test_graph_parser(string filename) {
