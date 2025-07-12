@@ -8,6 +8,10 @@
 #include "movingai_scen_parser.hpp"
 #include "search_astar.hpp"
 #include <cassert>
+#include <cstdlib>
+
+const char* mapFile = std::getenv("MAPFILE");
+const char* scenFile = std::getenv("SCENFILE");
 
 // Function declarations for testing different A* implementations
 int TestAstar();
@@ -128,8 +132,6 @@ int TestAstarGrid2d() {
 
 int TestMovingAIGrid2D() {
   // Load map and scenario files for the MovingAI benchmark
-  std::string mapfile = "./data/arena/arena.map";
-  std::string scenfile = "./data/arena/arena.map.scen";
   movingai::gridmap _g(mapfile);
   movingai::scenario_manager scen_mgr;
   scen_mgr.load_scenario(scenfile);
