@@ -44,7 +44,7 @@
    pp.AddEdgeCstr(24,25,6);
    pp.AddNodeCstr(99,20);
    pp.SetHeuWeight(1.2);
-   auto p = pp.PathFinding(0,99,1);
+   auto p = pp.PathFinding(0,99,10);
  
  
    // auto d_all = pp.GetDistAll();

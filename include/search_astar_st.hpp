@@ -20,6 +20,23 @@ namespace raplab{
 /**
  * @brief
  */
+
+struct Node {
+	long id;
+	double g;
+	double h;
+  
+	Node(long id_, double g_, double h_)
+		: id(id_), g(g_), h(h_) {}
+  
+	double f() const { return g + h; }
+  
+	// Min-heap based on f = g + h
+	bool operator<(const Node& rhs) const {
+	  return f() > rhs.f(); // For std::priority_queue to behave like min-heap
+	}
+};
+
 struct StateST {
 	long id;
 	long v;

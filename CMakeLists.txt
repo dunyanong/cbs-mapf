@@ -52,3 +52,12 @@ target_link_libraries(animation_astar
   Threads::Threads
   ${OpenCV_LIBS}
 )
+
+add_executable(
+  animation_astar_time animation/animation_astar_time.cpp
+)
+target_link_libraries(animation_astar_time
+  ${PROJECT_NAME}
+  Threads::Threads
+  ${OpenCV_LIBS}
+)

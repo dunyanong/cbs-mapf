@@ -149,7 +149,6 @@ int main() {
     }
 
     waitKey(1000);
-
     destroyAllWindows();
     return 0;
 }

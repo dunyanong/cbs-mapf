@@ -59,9 +59,6 @@ To set up and use this repository, follow these steps:
     ```bash
     ./<binary-name> <input-args>
     ```
-```
-
-
-
+    
 #### Acknowledgement
 Credits to Zhongqiang Richard Ren and Robotics, Autonomy and Planning Lab (RAP-Lab)

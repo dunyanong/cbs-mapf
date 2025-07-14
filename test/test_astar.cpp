@@ -132,9 +132,9 @@ int TestAstarGrid2d() {
 
 int TestMovingAIGrid2D() {
   // Load map and scenario files for the MovingAI benchmark
-  movingai::gridmap _g(mapfile);
+  movingai::gridmap _g(mapFile);
   movingai::scenario_manager scen_mgr;
-  scen_mgr.load_scenario(scenfile);
+  scen_mgr.load_scenario(scenFile);
 
   // Timer to measure execution time
   raplab::SimpleTimer timer;
