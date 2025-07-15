@@ -5,116 +5,85 @@
 #include <string>
 #include "movingai_map_parser.hpp"
 #include "movingai_scen_parser.hpp"
-#include "search_astar.hpp"
+#include "search_astar_st.hpp"
+#include <cstdlib>
+#include "animation_opencv.hpp"
 
 using namespace std;
 using namespace cv;
 using namespace movingai;
 using namespace raplab;
+using namespace opencv_animation;
 
-const int CELL_SIZE = 10;
-const Scalar OBSTACLE_COLOR(0, 0, 0);
-const Scalar EMPTY_COLOR(255, 255, 255);
-const Scalar PATH_COLOR(0, 255, 0);
-const Scalar AGENT_COLOR(0, 0, 255);
-const Scalar START_COLOR(255, 0, 255);
-const Scalar GOAL_COLOR(0, 255, 255);
-
-void drawGrid(const gridmap& map, Mat& img) {
-    for (int y = 0; y < map.height_; y++) {
-        for (int x = 0; x < map.width_; x++) {
-            Rect cell(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            if (map.is_obstacle({x, y})) {
-                rectangle(img, cell, OBSTACLE_COLOR, FILLED);
-            } else {
-                rectangle(img, cell, EMPTY_COLOR, FILLED);
-            }
-        }
-    }
-}
-
-void drawPath(const vector<State>& path, Mat& img, const State& start, const State& goal) {
-    for (const auto& state : path) {
-        if ((state.x == start.x && state.y == start.y) ||
-            (state.x == goal.x && state.y == goal.y)) {
-            continue;
-        }
-        Rect cell(state.x * CELL_SIZE, state.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        rectangle(img, cell, PATH_COLOR, FILLED);
-    }
-}
-
-void drawAgent(const State& agent, Mat& img) {
-    Rect cell(agent.x * CELL_SIZE, agent.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    rectangle(img, cell, AGENT_COLOR, FILLED);
-}
-
-vector<State> convertPath(const vector<long>& path, int width) {
-    vector<State> result;
-    for (long id : path) {
-        result.push_back({static_cast<vid>(id % width), static_cast<vid>(id / width)});
-
-    }
-    return result;
-}
-
-void drawStartAndGoal(const State& start, const State& goal, Mat& img) {
-    cout << "Drawing start marker at: (" << start.x << ", " << start.y << ")" << endl;
-    cout << "Drawing goal marker at: (" << goal.x << ", " << goal.y << ")" << endl;
-
-    Rect startCell(start.x * CELL_SIZE, start.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    Rect goalCell(goal.x * CELL_SIZE, goal.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-
-    rectangle(img, startCell, START_COLOR, FILLED);
-    rectangle(img, startCell, Scalar(0, 0, 0), 1);
-
-    rectangle(img, goalCell, GOAL_COLOR, FILLED);
-    rectangle(img, goalCell, Scalar(0, 0, 0), 1);
-}
+const char* mapFile = std::getenv("MAPFILE");
+const char* scenFile = std::getenv("SCENFILE");
 
 int main() {
-    string mapFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map";
-    string scenFile = "/Users/ongdunyan/Downloads/LocalCodes/cbs-mapf/data/arena/arena.map.scen";
+    if (!mapFile || !scenFile) {
+        cerr << "Error: MAPFILE or SCENFILE environment variable is not set!" << endl;
+        return -1;
+    }
 
     // Load map
-    gridmap map(mapFile);
+    gridmap grid_map(mapFile);
 
     // Load scenario
     scenario_manager scenMgr;
     scenMgr.load_scenario(scenFile);
 
     // Create OpenCV window
-    Mat img(map.height_ * CELL_SIZE, map.width_ * CELL_SIZE, CV_8UC3);
+    Mat img(grid_map.height_ * CELL_SIZE, grid_map.width_ * CELL_SIZE, CV_8UC3);
     namedWindow("Pathfinding Animation", WINDOW_AUTOSIZE);
 
     // Get the test case
-    auto expr = scenMgr.get_experiment(55); // For simplicity, using the 55th experiment
+    auto expr = scenMgr.get_experiment(159); // 159 is max experiment index
 
     if (!expr) {
         cerr << "Error: expr is null!" << endl;
         return -1;
-    }    
+    }
+
+    // Log start and goal positions
+    cout << "Start Position: (" << expr->startx() << ", " << expr->starty() << ")" << endl;
+    cout << "Goal Position: (" << expr->goalx() << ", " << expr->goaly() << ")" << endl;
+
+    // Check if start or goal is an obstacle
+    if (grid_map.is_obstacle({static_cast<vid>(expr->startx()), static_cast<vid>(expr->starty())})) {
+        cerr << "Error: Start position is an obstacle!" << endl;
+        return -1;
+    }
+    if (grid_map.is_obstacle({static_cast<vid>(expr->goalx()), static_cast<vid>(expr->goaly())})) {
+        cerr << "Error: Goal position is an obstacle!" << endl;
+        return -1;
+    }
 
     // Initialize A* planner
-    Grid2d g;
-    vector<vector<double>> occupancyGrid(map.height_, vector<double>(map.width_, 0));
-    for (int y = 0; y < map.height_; y++) {
-        for (int x = 0; x < map.width_; x++) {
-            occupancyGrid[y][x] = map.is_obstacle({x, y}) ? 1 : 0;
-        }
-    }
+    StateSpaceST g;
+    vector<vector<double>> occupancyGrid(grid_map.height_, vector<double>(grid_map.width_, 0));
+
     g.SetOccuGridPtr(&occupancyGrid);
 
-    AstarGrid2d planner;
-    planner.SetGraphPtr(&g);
+    auto pp = AstarSTGrid2d();
+    pp.SetGraphPtr(&g);
+    cout << "Graph initialized with occupancy grid." << endl;
+    pp.AddNodeCstr(3,3);
+    pp.AddNodeCstr(12,3);
+    pp.AddEdgeCstr(24,25,6);
+    pp.AddNodeCstr(99,20);
+    pp.SetHeuWeight(1.2);
 
     // Perform pathfinding
-    int startId = expr->starty() * map.width_ + expr->startx();
-    int goalId = expr->goaly() * map.width_ + expr->goalx();
-    auto path = planner.PathFinding(startId, goalId);
+    int startId = expr->starty() * grid_map.width_ + expr->startx();
+    int goalId = expr->goaly() * grid_map.width_ + expr->goalx();
+    cout << "Start ID: " << startId << ", Goal ID: " << goalId << endl;
+    auto path = pp.PathFinding(startId, goalId);
 
     // Convert path to grid coordinates
-    auto gridPath = convertPath(path, map.width_);
+    auto gridPath = convertPath(path, grid_map.width_);
+    if (path.empty()) {
+        cerr << "Pathfinding failed: No path found!" << endl;
+        return -1;
+    }    
 
     // Draw initial grid
     State startState = {
@@ -125,7 +94,7 @@ int main() {
         static_cast<vid>(expr->goalx()),
         static_cast<vid>(expr->goaly())
     };
-    drawGrid(map, img);
+    drawGrid(grid_map, img);
     drawPath(gridPath, img, startState, goalState);
     drawStartAndGoal(startState, goalState, img);
 
@@ -140,15 +109,14 @@ int main() {
 
     // Animate agent movement
     for (const auto& state : gridPath) {
-        // cout << "Drawing agent at: (" << state.x << ", " << state.y << ")" << endl;
         Mat frame = img.clone();
         drawAgent(state, frame);
         imshow("Pathfinding Animation", frame);
-        waitKey(100); // Delay for animation
+        waitKey(500); // Delay for animation
     }
 
-    waitKey(1000);
-
+    waitKey(0); 
     destroyAllWindows();
-    return 0;
+    return 0;    
+    
 }
