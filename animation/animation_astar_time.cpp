@@ -7,70 +7,16 @@
 #include "movingai_scen_parser.hpp"
 #include "search_astar_st.hpp"
 #include <cstdlib>
+#include "animation_opencv.hpp"
 
 using namespace std;
 using namespace cv;
 using namespace movingai;
 using namespace raplab;
-
-const int CELL_SIZE = 10;
-const Scalar OBSTACLE_COLOR(0, 0, 0);
-const Scalar EMPTY_COLOR(255, 255, 255);
-const Scalar PATH_COLOR(0, 255, 0);
-const Scalar AGENT_COLOR(0, 0, 255);
-const Scalar START_COLOR(255, 0, 255);
-const Scalar GOAL_COLOR(0, 255, 255);
+using namespace opencv_animation;
 
 const char* mapFile = std::getenv("MAPFILE");
 const char* scenFile = std::getenv("SCENFILE");
-
-void drawGrid(const gridmap& map, Mat& img) {
-    for (int y = 0; y < map.height_; y++) {
-        for (int x = 0; x < map.width_; x++) {
-            Rect cell(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-            if (map.is_obstacle({x, y})) {
-                rectangle(img, cell, OBSTACLE_COLOR, FILLED);
-            } else {
-                rectangle(img, cell, EMPTY_COLOR, FILLED);
-            }
-        }
-    }
-}
-
-void drawPath(const vector<State>& path, Mat& img, const State& start, const State& goal) {
-    for (const auto& state : path) {
-        if ((state.x == start.x && state.y == start.y) ||
-            (state.x == goal.x && state.y == goal.y)) {
-            continue;
-        }
-        Rect cell(state.x * CELL_SIZE, state.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        rectangle(img, cell, PATH_COLOR, FILLED);
-    }
-}
-
-void drawAgent(const State& agent, Mat& img) {
-    Rect cell(agent.x * CELL_SIZE, agent.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    rectangle(img, cell, AGENT_COLOR, FILLED);
-}
-
-vector<State> convertPath(const vector<long>& path, int width) {
-    vector<State> result;
-    for (long id : path) {
-        result.push_back({static_cast<vid>(id % width), static_cast<vid>(id / width)});
-    }
-    return result;
-}
-
-void drawStartAndGoal(const State& start, const State& goal, Mat& img) {
-    Rect startCell(start.x * CELL_SIZE, start.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    Rect goalCell(goal.x * CELL_SIZE, goal.y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-
-    rectangle(img, startCell, START_COLOR, FILLED);
-    rectangle(img, startCell, Scalar(0, 0, 0), 1);
-
-    rectangle(img, goalCell, GOAL_COLOR, FILLED);
-    rectangle(img, goalCell, Scalar(0, 0, 0), 1);
-}
 
 int main() {
     if (!mapFile || !scenFile) {
@@ -90,7 +36,7 @@ int main() {
     namedWindow("Pathfinding Animation", WINDOW_AUTOSIZE);
 
     // Get the test case
-    auto expr = scenMgr.get_experiment(55); // For simplicity, using the 55th experiment
+    auto expr = scenMgr.get_experiment(159); // 159 is max experiment index
 
     if (!expr) {
         cerr << "Error: expr is null!" << endl;
@@ -110,30 +56,21 @@ int main() {
         cerr << "Error: Goal position is an obstacle!" << endl;
         return -1;
     }
-    cout << "Start Position: (" << static_cast<vid>(expr->startx()) << ", " << static_cast<vid>(expr->starty()) << ")" << endl;
-    cout << "Goal Position: (" << static_cast<vid>(expr->goalx()) << ", " << static_cast<vid>(expr->goaly()) << ")" << endl;
-    cout << "Start is " << (grid_map.is_obstacle({static_cast<vid>(expr->startx()), static_cast<vid>(expr->starty())}) ? "Obstacle" : "Free") << endl;
-    cout << "Goal is " << (grid_map.is_obstacle({static_cast<vid>(expr->goalx()), static_cast<vid>(expr->goaly())}) ? "Obstacle" : "Free") << endl;
 
     // Initialize A* planner
     StateSpaceST g;
     vector<vector<double>> occupancyGrid(grid_map.height_, vector<double>(grid_map.width_, 0));
-    for (int y = 0; y < grid_map.height_; y++) {
-        for (int x = 0; x < grid_map.width_; x++) {
-            cout << "Cell (" << x << ", " << y << ") is " 
-                 << (grid_map.is_obstacle({x, y}) ? "Obstacle" : "Free") << endl;
-        }
-    }
+
     g.SetOccuGridPtr(&occupancyGrid);
 
     auto pp = AstarSTGrid2d();
     pp.SetGraphPtr(&g);
     cout << "Graph initialized with occupancy grid." << endl;
-    // pp.AddNodeCstr(3,3);
-    // pp.AddNodeCstr(12,3);
-    // pp.AddEdgeCstr(24,25,6);
-    // pp.AddNodeCstr(99,20);
-    // pp.SetHeuWeight(1.2);
+    pp.AddNodeCstr(3,3);
+    pp.AddNodeCstr(12,3);
+    pp.AddEdgeCstr(24,25,6);
+    pp.AddNodeCstr(99,20);
+    pp.SetHeuWeight(1.2);
 
     // Perform pathfinding
     int startId = expr->starty() * grid_map.width_ + expr->startx();
@@ -175,10 +112,10 @@ int main() {
         Mat frame = img.clone();
         drawAgent(state, frame);
         imshow("Pathfinding Animation", frame);
-        waitKey(100); // Delay for animation
+        waitKey(500); // Delay for animation
     }
 
-    waitKey(1000);
+    waitKey(0); 
     destroyAllWindows();
     return 0;    
     

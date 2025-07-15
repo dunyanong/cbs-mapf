@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(cppraplab)
 
 find_package(Threads REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgcodecs highgui)
+find_package(OpenCV REQUIRED COMPONENTS core imgcodecs highgui imgproc)
 
 set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
 
@@ -20,6 +20,11 @@ include_directories(
 # Create a shared library from all the source files
 add_library(${PROJECT_NAME} SHARED
   ${ALL_SRCS}
+)
+
+target_link_libraries(${PROJECT_NAME}
+  Threads::Threads
+  ${OpenCV_LIBS}
 )
 
 # Define the directory containing test files
@@ -61,3 +66,6 @@ target_link_libraries(animation_astar_time
   Threads::Threads
   ${OpenCV_LIBS}
 )
+
+message(STATUS "OpenCV Include Directories: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "OpenCV Libraries: ${OpenCV_LIBS}")
