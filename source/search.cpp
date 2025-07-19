@@ -13,7 +13,7 @@ namespace raplab{
 GraphSearch::GraphSearch() {};
 
 GraphSearch::~GraphSearch() {};
-
+// 
 void GraphSearch::SetGraphPtr(PlannerGraph* g) {
   _graph = g;
   _vs = -1; // every time when the graph is changed, reset start and goals.

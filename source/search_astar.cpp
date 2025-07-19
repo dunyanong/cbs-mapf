@@ -20,7 +20,9 @@ Astar::~Astar() {
 };
 
 // Heuristic function for Astar (default implementation returns 0)
-// This can be overridden in derived classes for specific heuristics
+// aruments: v - vertex ID
+// Returns: heuristic value (default is 0)
+// purpose: To get the heuristic value for a vertex, which is used in A* search to estimate the cost from the current node to the goal node.
 double Astar::_heuristic(long v) {
   return 0;
 };

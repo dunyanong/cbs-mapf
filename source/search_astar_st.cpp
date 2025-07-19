@@ -124,7 +124,7 @@ int AstarSTGrid2d::_search() {
   timer.Start();
 
   // init search
-  StateST s0;
+  StateST s0; // initial state
   s0.v = _vs;
   s0.t = _ts;
   s0.id = _gen_label_id();
@@ -155,7 +155,7 @@ int AstarSTGrid2d::_search() {
     if (DEBUG_ASTAR_ST > 0) {
       std::cout << "[DEBUG] ### Pop state = " << s << " g=" << g_s << " h=" << _heuristic(s.v) << " f=" << cur.f() << std::endl;
     }
-
+    // 
     if ( _check_terminate(s) ){
       _reached_goal_state_id = s.id;
       break;
@@ -178,7 +178,7 @@ int AstarSTGrid2d::_search() {
     for (int idx = 0; idx < succs.size(); idx++) {
       auto& s2 = succs[idx];
 
-      // move from (v,t) to (u,t+1), collision check
+      // move from (v,t) to (u,t+1), collision check, arguments in words are:
       if ( _collide_check(s.v, s2.v, s.t) ) {
         continue; // this ngh (u,t) is in conflict, skip.
       }
@@ -291,6 +291,7 @@ bool AstarSTGrid2d::_collide_check(long v1, long v2, long t) {
   if (_avl_edge.find(v1) == _avl_edge.end() ) {
     return false;
   }
+  
   if (_avl_edge[v1].find(v2) == _avl_edge[v1].end() ) {
     return false;
   }

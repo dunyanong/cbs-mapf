@@ -20,7 +20,7 @@ Dijkstra::~Dijkstra() {
 };
 
 // Main pathfinding function for Dijkstra's algorithm
-// vs: start vertex, vg: goal vertex, time_limit: max time allowed, cdim: cost dimension
+// vs: start vertex, vg: goal vertex, time_limit: max time allowed, cdim: cost dimension (cost dimention is the index of the cost vector)
 std::vector<long> Dijkstra::PathFinding(long vs, long vg, double time_limit, short cdim) {
     _mode = 0; // Mode 0: start-goal pathfinding
     _cdim = cdim;
@@ -31,7 +31,7 @@ std::vector<long> Dijkstra::PathFinding(long vs, long vg, double time_limit, sho
     return GetPath(vg); // Return the path to the goal
 };
 
-// Exhaustive backwards search from a goal vertex
+// Exhaustive backward search from a goal vertex, this 
 int Dijkstra::ExhaustiveBackwards(long vg, double time_limit, short cdim) {
     _mode = 1; // Mode 1: exhaustive backwards search
     _cdim = cdim;
@@ -196,7 +196,7 @@ std::vector<long> Dijkstra::GetPath(long v, bool do_reverse) {
 
 // Get the distances to all vertices
 std::vector<double> Dijkstra::GetDistAll() {
-    return _v2d;
+    return _v2d; // 
 };
 
 // Get the distance to a specific vertex
@@ -211,7 +211,7 @@ std::vector<double> Dijkstra::GetSolutionCost() {
 
 // Get the cost vector of the path to a specific vertex
 std::vector<double> Dijkstra::GetPathCost(long v) {
-    return _cvec[v];
+    return _cvec[v]; 
 };
 
 } // end namespace raplab
